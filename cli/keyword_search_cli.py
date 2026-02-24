@@ -6,6 +6,7 @@ import math
 import os
 import string
 
+from constants import *
 from inverted_index import InvertedIndex
 from preprocessing import preprocess
 
@@ -42,6 +43,17 @@ def main() -> None:
     tfidf_parser = subparsers.add_parser("tfidf",help="Overall scoring for term in document")
     tfidf_parser.add_argument("doc_id",type=int,help="Document ID")
     tfidf_parser.add_argument("term", type=str, help="Term to check")
+
+    bm25_idf_parser = subparsers.add_parser("bm25idf",help="Get BM25 IDF for term")
+    bm25_idf_parser.add_argument("term", type=str,help="Term to get BM25 IDF score for")
+    bm25_tf_parser = subparsers.add_parser("bm25tf",help="Get BM25 TF score for a given document ID and term")
+    bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
+    bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")    
+    bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 B parameter")    
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")   
+    bm25search_parser.add_argument("--limit", type=int, default=5,help="optional limit character")
 
     args = parser.parse_args()
     path = os.path.join(os.path.dirname(__file__),"..","data","movies.json")
@@ -140,6 +152,32 @@ def main() -> None:
 
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tfidf:.2f}")
 
+        case "bm25idf":
+            index = InvertedIndex()
+            bm25_idf = index.bm25_idf_command(args.term)
+            print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
+
+        case "bm25tf":
+            index = InvertedIndex()
+            bm25_tf = index.bm25_tf_command(args.doc_id,args.term,args.k1)
+            print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25_tf:.2f}")
+
+        case "bm25search":
+            print(f"Searching for: {args.query}")
+
+            index = InvertedIndex()
+
+            try:
+                index.load()
+            except FileNotFoundError:
+                print("index not found. run build first.")
+                return
+
+            results = index.bm25_search(args.query,args.limit)
+
+            for i,(doc,score) in enumerate(results,start=1):
+                title = index.docmap[doc]["title"]
+                print(f"{i}. ({doc}) {title} - Score: {score:.2f}")
 
         case _:
             parser.print_help()
