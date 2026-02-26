@@ -21,11 +21,26 @@ def verify_embeddings():
     
     with open("data/movies.json", "r") as f:
         documents = json.load(f)
-    embeddings = searcher.load_or_create_embeddings(documents)
+    embeddings = searcher.load_or_create_embeddings(documents["movies"])
     print(f"Number of docs:   {len(documents)}")
     print(f"Embeddings shape: {embeddings.shape[0]} vectors in {embeddings.shape[1]} dimensions")
 
-    
+def embed_query_text(query):
+    searcher = SemanticSearch()
+    embedding = searcher.generate_embedding(query)
+    print(f"Query: {query}")
+    print(f"First 5 dimensions: {embedding[:5]}")
+    print(f"Shape: {embedding.shape}")
+
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2) 
 
 class SemanticSearch():
     def __init__(self):
@@ -67,3 +82,16 @@ class SemanticSearch():
             if len(self.embeddings) == len(self.documents):
                 return self.embeddings
         return self.build_embeddings(documents)
+
+    def search(self,query,limit):
+        results = []
+
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call 'load_or_create_embeddings' first.")
+
+        embedding = self.generate_embedding(query)
+        for idx,movie_embedding in enumerate(self.embeddings):
+            results.append((cosine_similarity(embedding,movie_embedding),self.documents[idx]))
+        sorted_scores = sorted(results,key=lambda x: x[0],reverse=True)
+        top_result = sorted_scores[:limit]
+        return [{"score": score, "title": doc["title"], "description":doc["description"]} for score,doc in top_result]
