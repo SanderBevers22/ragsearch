@@ -13,7 +13,8 @@ class InvertedIndex():
         self.docmap = {}
         self.term_frequencies = {}
         self.doc_lengths = {}
-
+        self.index_path = "cache"
+        
     def __add_document(self, doc_id, text,stopwords=None):
         tokens = preprocess(text,stopwords)
         

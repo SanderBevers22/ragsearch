@@ -4,6 +4,7 @@ import argparse
 import re
 
 from lib.semantic_search import *
+from lib.chunked_semantic_search import *
 
 def main():
     parser = argparse.ArgumentParser(description="Semantic Search CLI")
@@ -25,6 +26,10 @@ def main():
     semantic_chunk_parser.add_argument("text",type=str,help="text to chunk")
     semantic_chunk_parser.add_argument("--max-chunk-size",type=int,default=4,help="max chunk size")
     semantic_chunk_parser.add_argument("--overlap",type=int,default=0,help="overlap of chunks")
+    embed_chunks_parser = subparsers.add_parser("embed_chunks", help="embed chunks")
+    search_chunked = subparsers.add_parser("search_chunked",help="Chunks to search")
+    search_chunked.add_argument("query",type=str,help="query used to search by chunks")
+    search_chunked.add_argument("--limit",type=int,default=5,help="limit")
     args = parser.parse_args()
 
     match args.command:
@@ -75,28 +80,26 @@ def main():
                 print(f"{idx}. {chunk}")
 
         case "semantic_chunk":
-            lines = re.split(r"(?<=[.!?])\s+",args.text)
-            chunks=[]
+            semantic_chunk(args.text,args.max_chunk_size,args.overlap)
 
-            if args.overlap > 0:
-                overlap = args.overlap
-            else:
-                overlap = 0
+        case "embed_chunks":
+            with open("data/movies.json", "r") as f:
+                documents = json.load(f)
+            chunked = ChunkedSemanticSearch()
+            chunked.load_or_create_chunk_embeddings(documents["movies"])
+            print(f"Generated {len(chunked.chunk_embeddings)} chunked embeddings")
 
-            i=0
-            while i < len(lines):
-                if i < args.max_chunk_size:
-                    chunk = " ".join(lines[i:i+args.max_chunk_size])
-                    chunks.append(chunk)
-                    i+=args.max_chunk_size
-                else:
-                    i-=overlap
-                    chunk = " ".join(lines[i:i+args.max_chunk_size])
-                    chunks.append(chunk)
-                    i+=args.max_chunk_size
-            print(f"Semantically chunking {len(args.text)} characters.")
-            for idx,chunk in enumerate(chunks,start=1):
-                print(f"{idx}. {chunk}")
+        case "search_chunked":
+            with open("data/movies.json", "r") as f:
+                documents = json.load(f)
+            search = ChunkedSemanticSearch()
+            search.load_or_create_chunk_embeddings(documents["movies"])
+
+            results = search.search_chunks(args.query,args.limit)
+
+            for i,result in enumerate(results,1):
+                print(f"\n{i}. {result['title']} (score: {result['score']:.4f})")
+                print(f"   {result['document']}...")
 
         case _:
             parser.print_help()

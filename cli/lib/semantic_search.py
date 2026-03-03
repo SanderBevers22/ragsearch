@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import numpy as np
 
 from sentence_transformers import SentenceTransformer
@@ -42,9 +43,51 @@ def cosine_similarity(vec1, vec2):
 
     return dot_product / (norm1 * norm2) 
 
+def semantic_chunk(text,chunk_size,overlap_int):
+    text = text.strip()
+    if not text:
+        return []
+
+    lines = re.split(r"(?<=[.!?])\s+",text)
+    if len(lines) == 1 and not re.search(r'[.!?]$',lines[0]):
+        lines = [text]
+
+    cleaned = []
+    for line in lines:
+        line = line.strip()
+        if line:
+            cleaned.append(line)
+
+    if not cleaned:
+        return []
+    
+    chunks=[]
+
+    overlap = max(0,overlap_int)
+    step = chunk_size - overlap
+    
+    if step <= 0:
+        step = 1
+
+    i=0
+    while i < len(cleaned):
+        if i < chunk_size:
+            chunk = " ".join(lines[i:i+chunk_size])
+            chunks.append(chunk)
+            i+=chunk_size
+        else:
+            i-=step
+            chunk = " ".join(lines[i:i+chunk_size])
+            chunks.append(chunk)
+            i+=chunk_size
+        print(f"Semantically chunking {len(text)} characters.")
+        for idx,chunk in enumerate(chunks,start=1):
+            print(f"{idx}. {chunk}")
+    return chunks
+
 class SemanticSearch():
-    def __init__(self):
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+    def __init__(self,model_name = "all-MiniLM-L6-v2"):
+        self.model = SentenceTransformer(model_name)
         self.embeddings = None
         self.documents = None
         self.document_map = {}
