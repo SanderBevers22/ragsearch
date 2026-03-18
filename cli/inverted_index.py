@@ -3,17 +3,17 @@ import os
 import pickle
 import string
 
-from collections import Counter
+from collections import Counter, defaultdict
 from constants import *
 from preprocessing import preprocess
 
 class InvertedIndex():
     def __init__(self):
-        self.index = {}
+        self.index = defaultdict(set)
         self.docmap = {}
-        self.term_frequencies = {}
+        self.term_frequencies = defaultdict(Counter)
         self.doc_lengths = {}
-        self.index_path = "cache"
+        self.index_path = "cache/index.pkl"
         
     def __add_document(self, doc_id, text,stopwords=None):
         tokens = preprocess(text,stopwords)
@@ -47,7 +47,11 @@ class InvertedIndex():
         docs = self.index.get(term,set())
         return sorted(list(docs))
 
-    def build(self,movies,stopwords=None):
+    def build(self,stopwords=None):
+        import json
+        with open("data/movies.json","r") as f:
+            data = json.load(f)
+        movies = data["movies"]
         for movie in movies:
             doc_id = movie["id"]
             self.docmap[doc_id] = movie
@@ -102,7 +106,7 @@ class InvertedIndex():
         token = tokens[0]
 
         totaldocs = len(self.docmap)
-        totalmatch = len(self.get_documents(token))
+        totalmatch = len(self.index[token])
     
         idf = math.log((totaldocs-totalmatch+0.5)/(totalmatch + 0.5)+1)
         return idf

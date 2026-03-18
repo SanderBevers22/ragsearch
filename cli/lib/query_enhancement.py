@@ -68,6 +68,25 @@ def individual_reranking(query,doc):
 
     return prompt
 
+def batch_reranking(query,docs):
+    doc_list = "\n".join(f"{doc['id']}: {doc['title']} - {doc['description'][:120]}" for doc in docs)
+
+    prompt = f"""Rank the movies listed below by relevance to the following search query.
+
+    Query: "{query}"
+
+    Movies:
+    {doc_list}
+
+    Return ONLY the movie IDs in order of relevance (best match first). Return a valid JSON list, nothing else.
+
+    For example:
+    [75, 12, 34, 2, 1]
+
+    Ranking:"""
+
+    return prompt
+
 def enhance_query(prompt):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")

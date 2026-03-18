@@ -4,6 +4,8 @@ import json
 from lib.hybrid_search import *
 from lib.query_enhancement import *
 
+from sentence_transformers import CrossEncoder
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hybrid Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -18,7 +20,8 @@ def main() -> None:
     rrf.add_argument("-k",type=int,default=60,help="Ranking parameter")
     rrf.add_argument("--limit",type=int,default=5,help="Limit search")
     rrf.add_argument("--enhance",type=str,choices=["spell","rewrite","expand"],help="Enhance your search with an LLM")
-    rrf.add_argument("--rerank-method",type=str,choices=["individual"],help="Rerank the enhanced search.")
+    rrf.add_argument("--rerank-method",type=str,choices=["individual","batch","cross_encoder"],help="Rerank the enhanced search.")
+    rrf.add_argument("--evaluate",type=bool,help="evaluate results or not")
     args = parser.parse_args()
 
     match args.command:
@@ -70,13 +73,13 @@ def main() -> None:
             with open("data/movies.json", "r") as f:
                 documents = json.load(f)
             search = HybridSearch(documents["movies"])
-            results = search.rrf_search(query,args.k,args.limit)
             
             match args.rerank_method:
                 case "individual":
                     print(f"\nReranking top {args.limit} results using individual method...")
                     print(f"Reciprocal Rank Fusion Results for '{query}' (k={args.k}):")
 
+                    results = search.rrf_search(query,args.k,args.limit*5)
                     import time
 
                     reranked = []
@@ -114,8 +117,90 @@ def main() -> None:
                         )
                         print(f"   {doc['description'][:100]}...")
 
+                case "batch":
+                    print(f"\nReranking top {args.limit} results using batch method...")
+                    print(f"Reciprocal Rank Fusion Results for '{query}' (k={args.k}):")
+
+                    results = search.rrf_search(query,args.k,args.limit*5)
+                    
+                    docs = []
+                    for result in results:
+                        docs.append(result["document"])
+
+                    prompt = batch_reranking(query,docs)
+                    score_text = enhance_query(prompt)
+                   
+                    try:
+                        ranks = json.loads(score_text)
+                    except:
+                        print("failed to parse LLM response")
+                        return
+
+                    rank_map = {doc_id: rank for rank,doc_id in enumerate(ranks,1)}
+                    reranked = []
+
+                    for result in results:
+                        doc = result["document"]
+                        doc_id = doc["id"]
+
+                        result["rerank_score"] = rank_map.get(doc_id,9999)
+                        reranked.append(result)
+
+                    reranked = sorted(reranked, key=lambda x: x["rerank_score"])
+                    final = reranked[:args.limit]
+
+                    for i, result in enumerate(final,1):
+                        doc = result["document"]
+
+                        print(f"\n{i}. {doc['title']}")
+                        print(f"   Rerank Score: {result['rerank_score']}")
+                        print(f"   RRF Score: {result['rrf']:.3f}")
+                        print(
+                            f"   BM25 Rank: {result['bm25_rank']}, "
+                            f"Semantic Rank: {result['semantic_rank']}"
+                        )
+                        print(f"   {doc['description'][:100]}...")
+
+                case "cross_encoder":
+                    print(f"\nReranking top {args.limit} results using batch method...")
+                    print(f"Reciprocal Rank Fusion Results for '{query}' (k={args.k}):")
+
+                    results = search.rrf_search(query,args.k,args.limit*5)
+
+                    pairs = []
+
+                    for result in results:
+                        doc = result["document"]
+                        pairs.append([query, f"{doc.get('title', '')} - {doc.get('description', '')}"])
+
+                    cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+
+                    scores = cross_encoder.predict(pairs)
+
+                    ranked = []
+
+                    for i,result in enumerate(results):
+                        result["cross_encoder_score"] = scores[i]
+                        ranked.append(result)
+
+                    ranked = sorted(ranked, key= lambda x: x["cross_encoder_score"],reverse=True)
+                    final = ranked[:args.limit]
+
+                    for i, result in enumerate(final,1):
+                        doc = result["document"]
+
+                        print(f"\n{i}. {doc['title']}")
+                        print(f"   Cross Encoder Score: {result['cross_encoder_score']}")
+                        print(f"   RRF Score: {result['rrf']:.3f}")
+                        print(
+                            f"   BM25 Rank: {result['bm25_rank']}, "
+                            f"Semantic Rank: {result['semantic_rank']}"
+                        )
+                        print(f"   {doc['description'][:100]}...")
+
                 case _:
                     print("no rerank method") 
+                    results = search.rrf_search(query,args.k,args.limit)
                     for i, result in enumerate(results, 1):
                         doc = result["document"]
 
@@ -126,6 +211,9 @@ def main() -> None:
                             f"Semantic Rank: {result['semantic_rank']}"
                         )
                         print(f"   {doc['description'][:100]}...")
+
+                if args.evaluate:
+                    print(results)
 
         case _:
             parser.print_help()

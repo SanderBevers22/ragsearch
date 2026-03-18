@@ -48,41 +48,20 @@ def semantic_chunk(text,chunk_size,overlap_int):
     if not text:
         return []
 
-    lines = re.split(r"(?<=[.!?])\s+",text)
-    if len(lines) == 1 and not re.search(r'[.!?]$',lines[0]):
-        lines = [text]
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    if len(sentences) == 1 and not text.endswith((".", "!", "?")):
+        sentences = [text]
 
-    cleaned = []
-    for line in lines:
-        line = line.strip()
-        if line:
-            cleaned.append(line)
+    chunks = []
+    i = 0
+    while i < len(sentences):
+        chunk_sentences = sentences[i : i + chunk_size]
+        if chunks and len(chunk_sentences) <= overlap_int:
+            break
+        chunk = " ".join([s.strip() for s in chunk_sentences])
+        chunks.append(chunk)
+        i += chunk_size - overlap_int
 
-    if not cleaned:
-        return []
-    
-    chunks=[]
-
-    overlap = max(0,overlap_int)
-    step = chunk_size - overlap
-    
-    if step <= 0:
-        step = 1
-
-    i=0
-    while i < len(cleaned):
-        if i < chunk_size:
-            chunk = " ".join(lines[i:i+chunk_size])
-            chunks.append(chunk)
-            i+=chunk_size
-        else:
-            i-=step
-            chunk = " ".join(lines[i:i+chunk_size])
-            chunks.append(chunk)
-            i+=chunk_size
-        print(f"Semantically chunking {len(text)} characters.")
-        for idx,chunk in enumerate(chunks,start=1):
-            print(f"{idx}. {chunk}")
     return chunks
 
 class SemanticSearch():
