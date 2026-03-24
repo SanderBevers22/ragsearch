@@ -87,6 +87,101 @@ def batch_reranking(query,docs):
 
     return prompt
 
+def rank_results(query,results):
+    formatted = "\n".join(
+        f"{i+1}. {r['document']['title']}: {r['document']['description'][:150]}"
+        for i, r in enumerate(results)
+    )
+
+    prompt = f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+    Query: "{query}"
+
+    Results:
+    {formatted}
+
+    Scale:
+    - 3: Highly relevant
+    - 2: Relevant
+    - 1: Marginally relevant
+    - 0: Not relevant
+
+    Do NOT give any numbers other than 0, 1, 2, or 3.
+
+    Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+    [2, 0, 3, 2, 0, 1]"""
+
+    return prompt
+
+def rag_results(query,docs):
+    prompt = f"""Answer the question or provide information based on the provided documents. This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+    Query: {query}
+
+    Documents:
+    {docs}
+
+    Provide a comprehensive answer that addresses the query:"""
+
+    return prompt
+
+def summarize_results(query,results):
+    prompt = f"""
+    Provide information useful to this query by synthesizing information from multiple search results in detail.
+    The goal is to provide comprehensive information so that users know what their options are.
+    Your response should be information-dense and concise, with several key pieces of information about the genre, plot, etc. of each movie.
+    This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+    Query: {query}
+    Search Results:
+    {results}
+    Provide a comprehensive 3–4 sentence answer that combines information from multiple sources:
+    """
+    return prompt
+
+def citation_results(query,documents):
+    prompt = f"""Answer the question or provide information based on the provided documents.
+
+    This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+    If not enough information is available to give a good answer, say so but give as good of an answer as you can while citing the sources you have.
+
+    Query: {query}
+
+    Documents:
+    {documents}
+
+    Instructions:
+    - Provide a comprehensive answer that addresses the query
+    - Cite sources using [1], [2], etc. format when referencing information
+    - If sources disagree, mention the different viewpoints
+    - If the answer isn't in the documents, say "I don't have enough information"
+    - Be direct and informative
+
+    Answer:"""
+
+    return prompt
+
+def question_results(question,context):
+    prompt = f"""Answer the user's question based on the provided movies that are available on Hoopla.
+
+        This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+        Question: {question}
+
+        Documents:
+        {context}
+
+        Instructions:
+        - Answer questions directly and concisely
+        - Be casual and conversational
+        - Don't be cringe or hype-y
+        - Talk like a normal person would in a chat conversation
+
+        Answer:"""
+
+    return prompt
+
 def enhance_query(prompt):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")

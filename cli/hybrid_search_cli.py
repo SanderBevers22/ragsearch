@@ -21,7 +21,7 @@ def main() -> None:
     rrf.add_argument("--limit",type=int,default=5,help="Limit search")
     rrf.add_argument("--enhance",type=str,choices=["spell","rewrite","expand"],help="Enhance your search with an LLM")
     rrf.add_argument("--rerank-method",type=str,choices=["individual","batch","cross_encoder"],help="Rerank the enhanced search.")
-    rrf.add_argument("--evaluate",type=bool,help="evaluate results or not")
+    rrf.add_argument("--evaluate",action="store_true",help="evaluate results or not")
     args = parser.parse_args()
 
     match args.command:
@@ -212,8 +212,13 @@ def main() -> None:
                         )
                         print(f"   {doc['description'][:100]}...")
 
-                if args.evaluate:
-                    print(results)
+            if args.evaluate:
+                prompt = rank_results(query,results)
+                response = enhance_query(prompt)
+
+                scores = json.loads(response)
+                for i, (result,score) in enumerate(zip(results,scores),start=1):
+                    print(f"{i}. {result['document']['title']}: {score}/3")
 
         case _:
             parser.print_help()
